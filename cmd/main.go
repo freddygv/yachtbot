@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -18,7 +19,10 @@ func main() {
 	client = &http.Client{Timeout: time.Second * 10}
 
 	ticker := "bitcoin"
-	getSingle(ticker)
+	err := getSingle(ticker)
+	if err != nil {
+		fmt.Printf("Error: %s", err)
+	}
 	getAll()
 }
 
@@ -46,6 +50,31 @@ func getSingle(ticker string) error {
 		return err
 	}
 
+	priceUSD, err := strconv.ParseFloat(payload[0].PriceUSD, 64)
+	if err != nil {
+		return err
+	}
+
+	change24h, err := strconv.ParseFloat(payload[0].Change24h, 64)
+	if err != nil {
+		return err
+	}
+	change24h = priceUSD - (priceUSD / (change24h + 1))
+
+	change7d, err := strconv.ParseFloat(payload[0].Change7d, 64)
+	if err != nil {
+		return err
+	}
+	change7d = priceUSD - (priceUSD / (change7d + 1))
+
+	singleAttachment := fmt.Sprintf(slackAttachment,
+		payload[0].Name, payload[0].Symbol, payload[0].ID,
+		payload[0].PriceUSD, payload[0].PriceBTC,
+		change24h, payload[0].Change24h,
+		change7d, payload[0].Change7d)
+
+	fmt.Println(singleAttachment)
+
 	return nil
 }
 
@@ -71,6 +100,11 @@ func getAll() error {
 	err = json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
 		return err
+	}
+
+	tickerMap := make(map[string]string)
+	for _, v := range payload {
+		tickerMap[v.Symbol] = v.ID
 	}
 
 	return nil
@@ -105,22 +139,22 @@ var slackAttachment = `{
 				"fields": [
 					{
 						"title": "Price USD",
-						"value": "%d",
+						"value": "$%s",
 						"short": true
 					},
 					{
 						"title": "Price BTC",
-						"value": "%d",
+						"value": "%s",
 						"short": true
 					},
 					{
 						"title": "24H Change",
-						"value": "%d (%s)",
+						"value": "%f (%s%%)",
 						"short": true
 					},
 					{
 						"title": "7D Change",
-						"value": "%d (%s)",
+						"value": "%f (%s%%)",
 						"short": true
 					}
 				],
