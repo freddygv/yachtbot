@@ -30,7 +30,7 @@ var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
 	bot := slackbot.New(conf.Slack.Token)
-	bot.Hear("(?i)").MessageHandler(QueryHandler)
+	bot.Hear("(?i)").MessageHandler(queryHandler)
 	bot.Run()
 }
 
@@ -51,14 +51,18 @@ func init() {
 	}
 }
 
-// QueryHandler handles price queries for a ticker
-func QueryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEvent) {
-	ticker := strings.Split(evt.Msg.Text, " ")[1]
-	if ticker == "XVG" {
+func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEvent) {
+	tickerSplit := strings.Split(evt.Msg.Text, " ")
+	fmt.Println(tickerSplit)
+
+	ticker := tickerSplit[1]
+
+	// Easter eggs
+	switch ticker {
+	case "XVG":
 		bot.Reply(evt, ":joy::joy::joy:", slackbot.WithTyping)
 		return
-	}
-	if ticker == "XRP" {
+	case "USD":
 		bot.Reply(evt, ":trash:", slackbot.WithTyping)
 		return
 	}
