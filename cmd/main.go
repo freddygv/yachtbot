@@ -36,12 +36,12 @@ func getSingle(ticker string) error {
 
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("getSingle req error: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("getSingle Do error: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -52,23 +52,23 @@ func getSingle(ticker string) error {
 	payload := make([]Response, 0)
 	err = json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("getSingle Decode error: %v", err)
 	}
 
 	priceUSD, err := strconv.ParseFloat(payload[0].PriceUSD, 64)
 	if err != nil {
-		return err
+		return fmt.Errorf("getSingle ParseFloat error: %v", err)
 	}
 	bigPrice := big.NewFloat(priceUSD)
 
 	change24h, err := dollarDifference(payload[0].Change24h, bigPrice)
 	if err != nil {
-		return err
+		return fmt.Errorf("getSingle error: %v", err)
 	}
 
 	change7d, err := dollarDifference(payload[0].Change7d, bigPrice)
 	if err != nil {
-		return err
+		return fmt.Errorf("getSingle error: %v", err)
 	}
 
 	singleAttachment := fmt.Sprintf(slackAttachment,
@@ -87,12 +87,12 @@ func getAll() error {
 
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("getAll req error: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("getAll Do error: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -103,7 +103,7 @@ func getAll() error {
 	payload := make([]Response, 0)
 	err = json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("getAll NewDecoder error: %v", err)
 	}
 
 	tickerMap := make(map[string]string)
@@ -117,7 +117,7 @@ func getAll() error {
 func dollarDifference(percentChange string, bigPrice *big.Float) (float64, error) {
 	parsedChange, err := strconv.ParseFloat(percentChange, 64)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("dollarDifference error: %v", err)
 	}
 	bigChange := new(big.Float).Quo(big.NewFloat(parsedChange), big.NewFloat(100))
 	priceYesterday := new(big.Float).Quo(bigPrice, (new(big.Float).Add(bigChange, big.NewFloat(1))))
