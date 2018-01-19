@@ -32,6 +32,7 @@ func main() {
 func init() {
 	client = &http.Client{Timeout: time.Second * 10}
 
+	// Decode DB connection details from local conf
 	_, err := toml.DecodeFile(confPath, &conf)
 	if err != nil {
 		panic(err)
@@ -47,6 +48,7 @@ func init() {
 }
 
 func getAll() error {
+	// Gets current data for all coins/tokens, don't know another way to get the IDs on demand
 	target := apiEndpoint + "?limit=0"
 
 	req, err := http.NewRequest("GET", target, nil)
@@ -75,6 +77,7 @@ func getAll() error {
 		tickerMap[v.Symbol] = v.ID
 	}
 
+	// Truncating the table then inserting row by row, simplest solution
 	if _, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s;", conf.Db.Table)); err != nil {
 		return fmt.Errorf("\n getAll truncate: %v", err)
 	}
