@@ -22,9 +22,13 @@ func main() {
 	ticker := "bitcoin"
 	err := getSingle(ticker)
 	if err != nil {
-		fmt.Printf("Error: %s", err)
+		panic(err)
 	}
-	getAll()
+
+	err = getAll()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func getSingle(ticker string) error {
