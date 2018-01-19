@@ -30,7 +30,7 @@ var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
 	bot := slackbot.New(conf.Slack.Token)
-	bot.Hear("(?i)").MessageHandler(queryHandler)
+	bot.Hear("(?i)(when yacht|when lambo)").MessageHandler(queryHandler)
 	bot.Run()
 }
 
@@ -55,7 +55,7 @@ func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEven
 	tickerSplit := strings.Split(evt.Msg.Text, " ")
 	fmt.Println(tickerSplit)
 
-	ticker := tickerSplit[1]
+	ticker := tickerSplit[len(tickerSplit)-1]
 
 	// Easter eggs
 	switch ticker {
@@ -69,7 +69,8 @@ func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEven
 
 	attachment, err := getSingle(ticker)
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return
 	}
 
 	attachments := []slack.Attachment{attachment}
@@ -80,6 +81,10 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	id, err := getID(db, ticker)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle getID: %v", err)
+	}
+
+	if id == "" {
+		return slack.Attachment{}, fmt.Errorf("\n getSingle null ID: %v", err)
 	}
 
 	target := apiEndpoint + id
@@ -105,21 +110,23 @@ func getSingle(ticker string) (slack.Attachment, error) {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle Decode: %v", err)
 	}
 
+	// No financial decisions better be made out of this
 	priceUSD, err := strconv.ParseFloat(payload[0].PriceUSD, 64)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle ParseFloat: %v", err)
 	}
-	bigPrice := big.NewFloat(priceUSD)
 
-	change24h, err := dollarDifference(payload[0].Change24h, bigPrice)
+	pct24h, err := strconv.ParseFloat(payload[0].Change24h, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n getSingle ParseFloat: %v", err)
 	}
+	diff24h := priceUSD - (priceUSD / (pct24h + 1))
 
-	change7d, err := dollarDifference(payload[0].Change7d, bigPrice)
+	pct7d, err := strconv.ParseFloat(payload[0].Change7d, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n getSingle ParseFloat: %v", err)
 	}
+	diff7d := priceUSD - (priceUSD / (pct7d + 1))
 
 	attachment := slack.Attachment{
 		Title:     fmt.Sprintf("Price of %s - $%s 🛥", payload[0].Name, payload[0].Symbol),
@@ -139,12 +146,12 @@ func getSingle(ticker string) (slack.Attachment, error) {
 			},
 			slack.AttachmentField{
 				Title: "24H Change",
-				Value: fmt.Sprintf("%s (%s%%)", currency(change24h), payload[0].Change24h),
+				Value: fmt.Sprintf("%s (%s%%)", currency(diff24h), payload[0].Change24h),
 				Short: true,
 			},
 			slack.AttachmentField{
 				Title: "7D Change",
-				Value: fmt.Sprintf("%s (%s%%)", currency(change7d), payload[0].Change7d),
+				Value: fmt.Sprintf("%s (%s%%)", currency(diff7d), payload[0].Change7d),
 				Short: true,
 			},
 		},
