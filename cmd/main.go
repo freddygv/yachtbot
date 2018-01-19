@@ -57,23 +57,15 @@ func getSingle(ticker string) error {
 	}
 	bigPrice := big.NewFloat(priceUSD)
 
-	change24h, err := strconv.ParseFloat(payload[0].Change24h, 64)
+	change24h, err := dollarDifference(payload[0].Change24h, bigPrice)
 	if err != nil {
 		return err
 	}
-	big24hChange := new(big.Float).Quo(big.NewFloat(change24h), big.NewFloat(100))
-	priceYest24h := new(big.Float).Quo(bigPrice, (new(big.Float).Add(big24hChange, big.NewFloat(1))))
-	big24hDiff := new(big.Float).Sub(bigPrice, priceYest24h)
-	change24h, _ = big24hDiff.Float64()
 
-	change7d, err := strconv.ParseFloat(payload[0].Change7d, 64)
+	change7d, err := dollarDifference(payload[0].Change7d, bigPrice)
 	if err != nil {
 		return err
 	}
-	big7dChange := new(big.Float).Quo(big.NewFloat(change7d), big.NewFloat(100))
-	priceLW7d := new(big.Float).Quo(bigPrice, (new(big.Float).Add(big7dChange, big.NewFloat(1))))
-	big7dDiff := new(big.Float).Sub(bigPrice, priceLW7d)
-	change7d, _ = big7dDiff.Float64()
 
 	singleAttachment := fmt.Sprintf(slackAttachment,
 		payload[0].Name, payload[0].Symbol, payload[0].ID,
@@ -116,6 +108,19 @@ func getAll() error {
 	}
 
 	return nil
+}
+
+func dollarDifference(percentChange string, bigPrice *big.Float) (float64, error) {
+	parsedChange, err := strconv.ParseFloat(percentChange, 64)
+	if err != nil {
+		return 0, err
+	}
+	bigChange := new(big.Float).Quo(big.NewFloat(parsedChange), big.NewFloat(100))
+	priceYesterday := new(big.Float).Quo(bigPrice, (new(big.Float).Add(bigChange, big.NewFloat(1))))
+	bigDiff := new(big.Float).Sub(bigPrice, priceYesterday)
+	difference, _ := bigDiff.Float64()
+
+	return difference, nil
 }
 
 // Response from CoinMarketCap API
