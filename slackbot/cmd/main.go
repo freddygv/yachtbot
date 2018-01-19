@@ -25,6 +25,8 @@ const (
 var client *http.Client
 var db *sql.DB
 var conf botConfig
+
+// Contains DB connection details and Slack token
 var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
@@ -37,11 +39,13 @@ func main() {
 func init() {
 	client = &http.Client{Timeout: time.Second * 10}
 
+	// Decode DB and Slack connection properties
 	_, err := toml.DecodeFile(confPath, &conf)
 	if err != nil {
 		panic(err)
 	}
 
+	// Connect to configured AWS RDS
 	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
 		conf.Db.User, conf.Db.Pw, conf.Db.Name, conf.Db.Endpoint, conf.Db.Port)
 
@@ -77,7 +81,9 @@ func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEven
 	bot.ReplyWithAttachments(evt, attachments, slackbot.WithTyping)
 }
 
+// getSingle returns Slack attachment with price information for a single coin/token
 func getSingle(ticker string) (slack.Attachment, error) {
+	// CoinMarketCap uses IDs to query the API, not ticker symbols
 	id, err := getID(db, ticker)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle getID: %v", err)
@@ -89,6 +95,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 
 	target := apiEndpoint + id
 
+	// Prepare and make the request
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle req: %v", err)
@@ -110,7 +117,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle Decode: %v", err)
 	}
 
-	// No financial decisions better be made out of this
+	// No financial decisions better be made out of this, using % change to calculate $ differences
 	priceUSD, err := strconv.ParseFloat(payload[0].PriceUSD, 64)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle ParseFloat: %v", err)
@@ -130,6 +137,8 @@ func getSingle(ticker string) (slack.Attachment, error) {
 
 	color, emoji := getReaction(pct24h)
 
+	// Formatted Slack attachment
+	// https://api.slack.com/docs/message-attachments
 	attachment := slack.Attachment{
 		Title:     fmt.Sprintf("Price of %s - $%s %s", payload[0].Name, payload[0].Symbol, emoji),
 		TitleLink: fmt.Sprintf("https://coinmarketcap.com/currencies/%s/", id),
@@ -163,6 +172,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	return attachment, nil
 }
 
+// Queries Postgres DB for ID that matches the incoming ticker symbol
 func getID(db *sql.DB, ticker string) (string, error) {
 	cleanTicker := strings.Replace(ticker, "$", "", -1)
 
@@ -187,6 +197,7 @@ func getID(db *sql.DB, ticker string) (string, error) {
 	return id, nil
 }
 
+// Determines color and emoji for Slack attachment based on 24h performance
 func getReaction(pct24h float64) (string, string) {
 	switch {
 	case pct24h < -50:
@@ -212,6 +223,7 @@ func getReaction(pct24h float64) (string, string) {
 
 type currency float64
 
+// Ensures that negative sign goes before dollar sign
 func (c currency) String() string {
 	if c < 0 {
 		return fmt.Sprintf("-$%.2f", math.Abs(float64(c)))
