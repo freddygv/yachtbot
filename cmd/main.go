@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
@@ -54,18 +55,25 @@ func getSingle(ticker string) error {
 	if err != nil {
 		return err
 	}
+	bigPrice := big.NewFloat(priceUSD)
 
 	change24h, err := strconv.ParseFloat(payload[0].Change24h, 64)
 	if err != nil {
 		return err
 	}
-	change24h = priceUSD - (priceUSD / (change24h + 1))
+	big24hChange := new(big.Float).Quo(big.NewFloat(change24h), big.NewFloat(100))
+	priceYest24h := new(big.Float).Quo(bigPrice, (new(big.Float).Add(big24hChange, big.NewFloat(1))))
+	big24hDiff := new(big.Float).Sub(bigPrice, priceYest24h)
+	change24h, _ = big24hDiff.Float64()
 
 	change7d, err := strconv.ParseFloat(payload[0].Change7d, 64)
 	if err != nil {
 		return err
 	}
-	change7d = priceUSD - (priceUSD / (change7d + 1))
+	big7dChange := new(big.Float).Quo(big.NewFloat(change7d), big.NewFloat(100))
+	priceLW7d := new(big.Float).Quo(bigPrice, (new(big.Float).Add(big7dChange, big.NewFloat(1))))
+	big7dDiff := new(big.Float).Sub(bigPrice, priceLW7d)
+	change7d, _ = big7dDiff.Float64()
 
 	singleAttachment := fmt.Sprintf(slackAttachment,
 		payload[0].Name, payload[0].Symbol, payload[0].ID,
