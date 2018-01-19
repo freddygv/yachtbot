@@ -20,30 +20,14 @@ const (
 )
 
 var client *http.Client
+var db *sql.DB
 var conf botConfig
 var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
-	client = &http.Client{Timeout: time.Second * 10}
-
-	if _, err := toml.DecodeFile(confPath, &conf); err != nil {
-		panic(err)
-	}
-
-	fmt.Println(conf.Slack.Token)
-
-	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-		conf.Db.User, conf.Db.Pw, conf.Db.Name, conf.Db.Endpoint, conf.Db.Port)
-
-	db, err := sql.Open("postgres", dbinfo)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
 	// TODO: Uncomment later
 	// ticker := "$BTC"
-	// err = getSingle(db, ticker)
+	// err := getSingle(db, ticker)
 	// if err != nil {
 	// 	panic(err)
 	// }
@@ -53,6 +37,24 @@ func main() {
 	// if err != nil {
 	// 	panic(err)
 	// }
+	db.Close()
+}
+
+func init() {
+	client = &http.Client{Timeout: time.Second * 10}
+
+	_, err := toml.DecodeFile(confPath, &conf)
+	if err != nil {
+		panic(err)
+	}
+
+	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
+		conf.Db.User, conf.Db.Pw, conf.Db.Name, conf.Db.Endpoint, conf.Db.Port)
+
+	db, err = sql.Open("postgres", dbinfo)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func getSingle(db *sql.DB, ticker string) error {
