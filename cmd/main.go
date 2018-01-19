@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -24,7 +25,7 @@ var conf botConfig
 func main() {
 	client = &http.Client{Timeout: time.Second * 10}
 
-	if _, err := toml.DecodeFile("/Users/freddy/.aws_conf/yachtbot.config", &conf); err != nil {
+	if _, err := toml.DecodeFile(os.Getenv("HOME")+"/.aws_conf/yachtbot.config", &conf); err != nil {
 		panic(err)
 	}
 
@@ -37,16 +38,18 @@ func main() {
 	}
 	defer db.Close()
 
+	// TODO: Remove later, just for testing
 	ticker := "$BTC"
 	err = getSingle(db, ticker)
 	if err != nil {
 		panic(err)
 	}
 
-	err = getAll(db)
-	if err != nil {
-		panic(err)
-	}
+	// TODO: Uncomment later
+	// err = getAll(db)
+	// if err != nil {
+	// 	panic(err)
+	// }
 }
 
 func getSingle(db *sql.DB, ticker string) error {
