@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"math/big"
 	"net/http"
 	"os"
 	"strconv"
@@ -128,11 +127,13 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	}
 	diff7d := priceUSD - (priceUSD / (pct7d + 1))
 
+	color, emoji := getReaction(pct24h)
+
 	attachment := slack.Attachment{
-		Title:     fmt.Sprintf("Price of %s - $%s 🛥", payload[0].Name, payload[0].Symbol),
+		Title:     fmt.Sprintf("Price of %s - $%s %s", payload[0].Name, payload[0].Symbol, emoji),
 		TitleLink: fmt.Sprintf("https://coinmarketcap.com/currencies/%s/", id),
 		Fallback:  "Cryptocurrency Price",
-		Color:     "#7CD197",
+		Color:     color,
 		Fields: []slack.AttachmentField{
 			slack.AttachmentField{
 				Title: "Price USD",
@@ -161,19 +162,6 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	return attachment, nil
 }
 
-func dollarDifference(percentChange string, bigPrice *big.Float) (float64, error) {
-	parsedChange, err := strconv.ParseFloat(percentChange, 64)
-	if err != nil {
-		return 0, fmt.Errorf("\n dollarDifference: %v", err)
-	}
-	bigChange := new(big.Float).Quo(big.NewFloat(parsedChange), big.NewFloat(100))
-	priceYesterday := new(big.Float).Quo(bigPrice, (new(big.Float).Add(bigChange, big.NewFloat(1))))
-	bigDiff := new(big.Float).Sub(bigPrice, priceYesterday)
-	difference, _ := bigDiff.Float64()
-
-	return difference, nil
-}
-
 func getID(db *sql.DB, ticker string) (string, error) {
 	cleanTicker := strings.Replace(ticker, "$", "", -1)
 
@@ -196,6 +184,29 @@ func getID(db *sql.DB, ticker string) (string, error) {
 	}
 
 	return id, nil
+}
+
+func getReaction(pct24h float64) (string, string) {
+	switch {
+	case pct24h < -50:
+		return "#d7191c", ":trash::fire:"
+	case pct24h < -25:
+		return "#d7191c", ":smoking:"
+	case pct24h < -10:
+		return "#fdae61", ":thinking_face:"
+	case pct24h < 0:
+		return "#ffffbf", ":zzz:"
+	case pct24h < 25:
+		return "#ffffbf", ":beers:"
+	case pct24h < 50:
+		return "#a6d96a", ":champagne:"
+	case pct24h < 100:
+		return "#1a9641", ":racing_car:"
+	case pct24h < 1000:
+		return "#1a9641", ":motor_boat:"
+	default:
+		return "#000000", ":full_moon_with_face:"
+	}
 }
 
 type currency float64
