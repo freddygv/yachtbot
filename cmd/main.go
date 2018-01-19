@@ -69,9 +69,9 @@ func getSingle(ticker string) error {
 
 	singleAttachment := fmt.Sprintf(slackAttachment,
 		payload[0].Name, payload[0].Symbol, payload[0].ID,
-		payload[0].PriceUSD, payload[0].PriceBTC,
-		change24h, payload[0].Change24h,
-		change7d, payload[0].Change7d)
+		fmt.Sprintf("%.2f", priceUSD), payload[0].PriceBTC,
+		fmt.Sprintf("%.2f", change24h), payload[0].Change24h,
+		fmt.Sprintf("%.2f", change7d), payload[0].Change7d)
 
 	fmt.Println(singleAttachment)
 
@@ -149,12 +149,12 @@ var slackAttachment = `{
 					},
 					{
 						"title": "24H Change",
-						"value": "%f (%s%%)",
+						"value": "$%s (%s%%)",
 						"short": true
 					},
 					{
 						"title": "7D Change",
-						"value": "%f (%s%%)",
+						"value": "$%s (%s%%)",
 						"short": true
 					}
 				],
