@@ -94,3 +94,39 @@ type Response struct {
 	Change7d        string `json:"percent_change_7d,omitempty"`
 	Updated         string `json:"last_updated,omitempty"`
 }
+
+var slackAttachment = `{
+		"attachments": [
+			{
+				"fallback": "Cryptocurrency Price",
+				"color": "#36a64f",
+				"title": "Price of %s - %s 🛥", 
+				"title_link": "https://coinmarketcap.com/currencies/%s/",
+				"fields": [
+					{
+						"title": "Price USD",
+						"value": "%d",
+						"short": true
+					},
+					{
+						"title": "Price BTC",
+						"value": "%d",
+						"short": true
+					},
+					{
+						"title": "24H Change",
+						"value": "%d (%s)",
+						"short": true
+					},
+					{
+						"title": "7D Change",
+						"value": "%d (%s)",
+						"short": true
+					}
+				],
+				"footer": "YachtBot",
+				"footer_icon": "https://emojipedia-us.s3.amazonaws.com/thumbs/160/apple/33/motor-boat_1f6e5.png",
+				"ts": 123456789
+			}
+		]
+	}`
