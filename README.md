@@ -1,2 +1,2 @@
-# cryptoslack
+# cryptoslack [WIP]
 Cryptocurrency Price Slackbot
