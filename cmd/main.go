@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+	_ "github.com/lib/pq"
 )
 
 const (
@@ -22,33 +24,47 @@ var conf botConfig
 func main() {
 	client = &http.Client{Timeout: time.Second * 10}
 
-	if _, err := toml.DecodeFile("/Users/freddy/.aws_conf/cryptoslack.config", &conf); err != nil {
+	if _, err := toml.DecodeFile("/Users/freddy/.aws_conf/yachtbot.config", &conf); err != nil {
 		panic(err)
 	}
 
-	ticker := "bitcoin"
-	err := getSingle(ticker)
+	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
+		conf.Db.User, conf.Db.Pw, conf.Db.Name, conf.Db.Endpoint, conf.Db.Port)
+
+	db, err := sql.Open("postgres", dbinfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	ticker := "$BTC"
+	err = getSingle(db, ticker)
 	if err != nil {
 		panic(err)
 	}
 
-	err = getAll()
+	err = getAll(db)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func getSingle(ticker string) error {
-	target := apiEndpoint + strings.Replace(ticker, "$", "", -1)
+func getSingle(db *sql.DB, ticker string) error {
+	id, err := getID(db, ticker)
+	if err != nil {
+		return fmt.Errorf("\n getSingle getID: %v", err)
+	}
+
+	target := apiEndpoint + id
 
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		return fmt.Errorf("\n getSingle req error: %v", err)
+		return fmt.Errorf("\n getSingle req: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("\n getSingle Do error: %v", err)
+		return fmt.Errorf("\n getSingle Do: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -59,23 +75,23 @@ func getSingle(ticker string) error {
 	payload := make([]Response, 0)
 	err = json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
-		return fmt.Errorf("\n getSingle Decode error: %v", err)
+		return fmt.Errorf("\n getSingle Decode: %v", err)
 	}
 
 	priceUSD, err := strconv.ParseFloat(payload[0].PriceUSD, 64)
 	if err != nil {
-		return fmt.Errorf("\n getSingle ParseFloat error: %v", err)
+		return fmt.Errorf("\n getSingle ParseFloat: %v", err)
 	}
 	bigPrice := big.NewFloat(priceUSD)
 
 	change24h, err := dollarDifference(payload[0].Change24h, bigPrice)
 	if err != nil {
-		return fmt.Errorf("\n getSingle error: %v", err)
+		return fmt.Errorf("\n getSingle: %v", err)
 	}
 
 	change7d, err := dollarDifference(payload[0].Change7d, bigPrice)
 	if err != nil {
-		return fmt.Errorf("\n getSingle error: %v", err)
+		return fmt.Errorf("\n getSingle: %v", err)
 	}
 
 	singleAttachment := fmt.Sprintf(slackAttachment,
@@ -89,17 +105,17 @@ func getSingle(ticker string) error {
 	return nil
 }
 
-func getAll() error {
+func getAll(db *sql.DB) error {
 	target := apiEndpoint + "?limit=0"
 
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		return fmt.Errorf("\n getAll req error: %v", err)
+		return fmt.Errorf("\n getAll req: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("\n getAll Do error: %v", err)
+		return fmt.Errorf("\n getAll Do: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -110,7 +126,7 @@ func getAll() error {
 	payload := make([]Response, 0)
 	err = json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
-		return fmt.Errorf("\n getAll NewDecoder error: %v", err)
+		return fmt.Errorf("\n getAll NewDecoder: %v", err)
 	}
 
 	tickerMap := make(map[string]string)
@@ -118,7 +134,21 @@ func getAll() error {
 		tickerMap[v.Symbol] = v.ID
 	}
 
-	// TODO: Upsert DB
+	if _, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s;", conf.Db.Table)); err != nil {
+		return fmt.Errorf("\n getAll truncate: %v", err)
+	}
+
+	for k, v := range tickerMap {
+		stmt, err := db.Prepare(fmt.Sprintf("INSERT INTO %s(ticker, id) VALUES($1, $2);", conf.Db.Table))
+		if err != nil {
+			return fmt.Errorf("\n getAll db.Prepare: %v", err)
+		}
+
+		_, err = stmt.Exec(k, v)
+		if err != nil {
+			return fmt.Errorf("\n getAll insert exec: %v", err)
+		}
+	}
 
 	return nil
 }
@@ -126,7 +156,7 @@ func getAll() error {
 func dollarDifference(percentChange string, bigPrice *big.Float) (float64, error) {
 	parsedChange, err := strconv.ParseFloat(percentChange, 64)
 	if err != nil {
-		return 0, fmt.Errorf("\n dollarDifference error: %v", err)
+		return 0, fmt.Errorf("\n dollarDifference: %v", err)
 	}
 	bigChange := new(big.Float).Quo(big.NewFloat(parsedChange), big.NewFloat(100))
 	priceYesterday := new(big.Float).Quo(bigPrice, (new(big.Float).Add(bigChange, big.NewFloat(1))))
@@ -134,6 +164,30 @@ func dollarDifference(percentChange string, bigPrice *big.Float) (float64, error
 	difference, _ := bigDiff.Float64()
 
 	return difference, nil
+}
+
+func getID(db *sql.DB, ticker string) (string, error) {
+	cleanTicker := strings.Replace(ticker, "$", "", -1)
+
+	stmt, err := db.Prepare(fmt.Sprintf("SELECT id FROM %s WHERE ticker = $1;", conf.Db.Table))
+	if err != nil {
+		return "", fmt.Errorf("\n getSingle db.Prepare: %v", err)
+	}
+
+	var id string
+	rows, err := stmt.Query(cleanTicker)
+	if err != nil {
+		return "", fmt.Errorf("\n getSingle query: %v", err)
+	}
+
+	for rows.Next() {
+		err = rows.Scan(&id)
+		if err != nil {
+			return "", fmt.Errorf("\n getSingle scan: %v", err)
+		}
+	}
+
+	return id, nil
 }
 
 // Response from CoinMarketCap API
@@ -162,6 +216,8 @@ type botConfig struct {
 type dbConfig struct {
 	Endpoint string
 	Port     string
+	Name     string
+	Table    string
 	User     string
 	Pw       string
 }
