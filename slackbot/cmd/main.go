@@ -29,7 +29,8 @@ var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
 	bot := slackbot.New(conf.Slack.Token)
-	bot.Hear("(?i)(when yacht|when lambo)").MessageHandler(queryHandler)
+	toMe := bot.Messages(slackbot.DirectMessage, slackbot.DirectMention).Subrouter()
+	toMe.Hear("").MessageHandler(queryHandler)
 	bot.Run()
 }
 
@@ -195,9 +196,9 @@ func getReaction(pct24h float64) (string, string) {
 	case pct24h < -10:
 		return "#fdae61", ":thinking_face:"
 	case pct24h < 0:
-		return "#ffffbf", ":zzz:"
+		return "#FAD898", ":zzz:"
 	case pct24h < 25:
-		return "#ffffbf", ":beers:"
+		return "#FAD898", ":beers:"
 	case pct24h < 50:
 		return "#a6d96a", ":champagne:"
 	case pct24h < 100:
