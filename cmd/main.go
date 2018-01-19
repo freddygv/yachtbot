@@ -21,13 +21,16 @@ const (
 
 var client *http.Client
 var conf botConfig
+var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
 	client = &http.Client{Timeout: time.Second * 10}
 
-	if _, err := toml.DecodeFile(os.Getenv("HOME")+"/.aws_conf/yachtbot.config", &conf); err != nil {
+	if _, err := toml.DecodeFile(confPath, &conf); err != nil {
 		panic(err)
 	}
+
+	fmt.Println(conf.Slack.Token)
 
 	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
 		conf.Db.User, conf.Db.Pw, conf.Db.Name, conf.Db.Endpoint, conf.Db.Port)
@@ -38,12 +41,12 @@ func main() {
 	}
 	defer db.Close()
 
-	// TODO: Remove later, just for testing
-	ticker := "$BTC"
-	err = getSingle(db, ticker)
-	if err != nil {
-		panic(err)
-	}
+	// TODO: Uncomment later
+	// ticker := "$BTC"
+	// err = getSingle(db, ticker)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	// TODO: Uncomment later
 	// err = getAll(db)
@@ -213,7 +216,8 @@ type Response struct {
 }
 
 type botConfig struct {
-	Db dbConfig
+	Db    dbConfig
+	Slack slackConfig
 }
 
 type dbConfig struct {
@@ -223,6 +227,10 @@ type dbConfig struct {
 	Table    string
 	User     string
 	Pw       string
+}
+
+type slackConfig struct {
+	Token string
 }
 
 var slackAttachment = `{
