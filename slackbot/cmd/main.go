@@ -55,7 +55,7 @@ func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEven
 	tickerSplit := strings.Split(evt.Msg.Text, " ")
 	fmt.Println(tickerSplit)
 
-	ticker := tickerSplit[len(tickerSplit)-1]
+	ticker := strings.ToUpper(tickerSplit[len(tickerSplit)-1])
 
 	// Easter eggs
 	switch ticker {
