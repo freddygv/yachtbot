@@ -8,16 +8,23 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
 )
 
 const (
-	endpoint = "https://api.coinmarketcap.com/v1/ticker/"
+	apiEndpoint = "https://api.coinmarketcap.com/v1/ticker/"
 )
 
 var client *http.Client
+var conf botConfig
 
 func main() {
 	client = &http.Client{Timeout: time.Second * 10}
+
+	if _, err := toml.DecodeFile("/Users/freddy/.aws_conf/cryptoslack.config", &conf); err != nil {
+		panic(err)
+	}
 
 	ticker := "bitcoin"
 	err := getSingle(ticker)
@@ -32,7 +39,7 @@ func main() {
 }
 
 func getSingle(ticker string) error {
-	target := endpoint + strings.Replace(ticker, "$", "", -1)
+	target := apiEndpoint + strings.Replace(ticker, "$", "", -1)
 
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
@@ -83,7 +90,7 @@ func getSingle(ticker string) error {
 }
 
 func getAll() error {
-	target := endpoint + "?limit=0"
+	target := apiEndpoint + "?limit=0"
 
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
@@ -110,6 +117,8 @@ func getAll() error {
 	for _, v := range payload {
 		tickerMap[v.Symbol] = v.ID
 	}
+
+	// TODO: Upsert DB
 
 	return nil
 }
@@ -144,6 +153,17 @@ type Response struct {
 	Change24h       string `json:"percent_change_24h,omitempty"`
 	Change7d        string `json:"percent_change_7d,omitempty"`
 	Updated         string `json:"last_updated,omitempty"`
+}
+
+type botConfig struct {
+	Db dbConfig
+}
+
+type dbConfig struct {
+	Endpoint string
+	Port     string
+	User     string
+	Pw       string
 }
 
 var slackAttachment = `{
