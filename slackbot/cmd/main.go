@@ -145,22 +145,22 @@ func getSingle(ticker string) (slack.Attachment, error) {
 		Fallback:  "Cryptocurrency Price",
 		Color:     color,
 		Fields: []slack.AttachmentField{
-			slack.AttachmentField{
+			{
 				Title: "Price USD",
 				Value: fmt.Sprintf("$%.2f", priceUSD),
 				Short: true,
 			},
-			slack.AttachmentField{
+			{
 				Title: "Price BTC",
 				Value: payload[0].PriceBTC,
 				Short: true,
 			},
-			slack.AttachmentField{
+			{
 				Title: "24H Change",
 				Value: fmt.Sprintf("%s (%s%%)", currency(diff24h), payload[0].Change24h),
 				Short: true,
 			},
-			slack.AttachmentField{
+			{
 				Title: "7D Change",
 				Value: fmt.Sprintf("%s (%s%%)", currency(diff7d), payload[0].Change7d),
 				Short: true,
