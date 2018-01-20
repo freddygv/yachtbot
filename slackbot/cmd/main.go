@@ -93,7 +93,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 
 	target := apiEndpoint + id
 
-	resp, err := sendRequest(target)
+	resp, err := makeRequest(target)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
 	}
@@ -131,20 +131,20 @@ func getID(db *sql.DB, ticker string) (string, error) {
 	return id, nil
 }
 
-func sendRequest(target string) (*http.Response, error) {
+func makeRequest(target string) (*http.Response, error) {
 	// Prepare and make the request
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		return nil, fmt.Errorf("\n sendRequest NewRequest: %v", err)
+		return nil, fmt.Errorf("\n makeRequest NewRequest: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("\n sendRequest Do: %v", err)
+		return nil, fmt.Errorf("\n makeRequest Do: %v", err)
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("\n sendRequest Bad response: %s", resp.Status)
+		return nil, fmt.Errorf("\n makeRequest Bad response: %s", resp.Status)
 	}
 
 	return resp, nil
