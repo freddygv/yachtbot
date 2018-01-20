@@ -57,8 +57,6 @@ func init() {
 
 func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEvent) {
 	tickerSplit := strings.Split(evt.Msg.Text, " ")
-	fmt.Println(tickerSplit)
-
 	ticker := strings.ToUpper(tickerSplit[len(tickerSplit)-1])
 
 	// Easter eggs
@@ -73,7 +71,7 @@ func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEven
 
 	attachment, err := getSingle(ticker)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err) // Stay alive if there's an error
 		return
 	}
 
@@ -86,7 +84,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	// CoinMarketCap uses IDs to query the API, not ticker symbols
 	id, err := getID(db, ticker)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle getID: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
 	}
 
 	if id == "" {
@@ -95,43 +93,86 @@ func getSingle(ticker string) (slack.Attachment, error) {
 
 	target := apiEndpoint + id
 
+	resp, err := sendRequest(target)
+	if err != nil {
+		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
+	}
+
+	attachment, err := processResponse(resp)
+	if err != nil {
+		return slack.Attachment{}, fmt.Errorf("\n getSingle: %s", resp.Status)
+	}
+
+	return attachment, nil
+}
+
+// Queries Postgres DB for ID that matches the incoming ticker symbol
+func getID(db *sql.DB, ticker string) (string, error) {
+	cleanTicker := strings.Replace(ticker, "$", "", -1)
+
+	stmt, err := db.Prepare(fmt.Sprintf("SELECT id FROM %s WHERE ticker = $1;", conf.Db.Table))
+	if err != nil {
+		return "", fmt.Errorf("\n getID db.Prepare: %v", err)
+	}
+
+	var id string
+	rows, err := stmt.Query(cleanTicker)
+	if err != nil {
+		return "", fmt.Errorf("\n getID query: %v", err)
+	}
+
+	for rows.Next() {
+		err = rows.Scan(&id)
+		if err != nil {
+			return "", fmt.Errorf("\n getID scan: %v", err)
+		}
+	}
+
+	return id, nil
+}
+
+func sendRequest(target string) (*http.Response, error) {
 	// Prepare and make the request
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle req: %v", err)
+		return nil, fmt.Errorf("\n sendRequest NewRequest: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle Do: %v", err)
+		return nil, fmt.Errorf("\n sendRequest Do: %v", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return slack.Attachment{}, fmt.Errorf("\n Bad response: %s", resp.Status)
+		return nil, fmt.Errorf("\n sendRequest Bad response: %s", resp.Status)
 	}
 
+	return resp, nil
+}
+
+func processResponse(resp *http.Response) (slack.Attachment, error) {
 	payload := make([]Response, 0)
-	err = json.NewDecoder(resp.Body).Decode(&payload)
+	err := json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle Decode: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n processResponse Decode: %v", err)
 	}
+	resp.Body.Close()
 
 	// No financial decisions better be made out of this, using % change to calculate $ differences
 	priceUSD, err := strconv.ParseFloat(payload[0].PriceUSD, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle ParseFloat: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n processResponse ParseFloat: %v", err)
 	}
 
 	pct24h, err := strconv.ParseFloat(payload[0].Change24h, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle ParseFloat: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n processResponse ParseFloat: %v", err)
 	}
 	diff24h := priceUSD - (priceUSD / (pct24h + 1))
 
 	pct7d, err := strconv.ParseFloat(payload[0].Change7d, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle ParseFloat: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n processResponse ParseFloat: %v", err)
 	}
 	diff7d := priceUSD - (priceUSD / (pct7d + 1))
 
@@ -141,7 +182,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	// https://api.slack.com/docs/message-attachments
 	attachment := slack.Attachment{
 		Title:     fmt.Sprintf("Price of %s - $%s %s", payload[0].Name, payload[0].Symbol, emoji),
-		TitleLink: fmt.Sprintf("https://coinmarketcap.com/currencies/%s/", id),
+		TitleLink: fmt.Sprintf("https://coinmarketcap.com/currencies/%s/", payload[0].ID),
 		Fallback:  "Cryptocurrency Price",
 		Color:     color,
 		Fields: []slack.AttachmentField{
@@ -170,31 +211,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	}
 
 	return attachment, nil
-}
 
-// Queries Postgres DB for ID that matches the incoming ticker symbol
-func getID(db *sql.DB, ticker string) (string, error) {
-	cleanTicker := strings.Replace(ticker, "$", "", -1)
-
-	stmt, err := db.Prepare(fmt.Sprintf("SELECT id FROM %s WHERE ticker = $1;", conf.Db.Table))
-	if err != nil {
-		return "", fmt.Errorf("\n getSingle db.Prepare: %v", err)
-	}
-
-	var id string
-	rows, err := stmt.Query(cleanTicker)
-	if err != nil {
-		return "", fmt.Errorf("\n getSingle query: %v", err)
-	}
-
-	for rows.Next() {
-		err = rows.Scan(&id)
-		if err != nil {
-			return "", fmt.Errorf("\n getSingle scan: %v", err)
-		}
-	}
-
-	return id, nil
 }
 
 // Determines color and emoji for Slack attachment based on 24h performance
