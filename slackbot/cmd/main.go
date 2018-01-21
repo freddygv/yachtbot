@@ -168,13 +168,13 @@ func prepareAttachment(resp *http.Response) (slack.Attachment, error) {
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n prepareAttachment ParseFloat: %v", err)
 	}
-	diff24h := priceUSD - (priceUSD / (pct24h + 1))
+	diff24h := priceUSD - (priceUSD / ((pct24h / 100) + 1))
 
 	pct7d, err := strconv.ParseFloat(payload[0].Change7d, 64)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n prepareAttachment ParseFloat: %v", err)
 	}
-	diff7d := priceUSD - (priceUSD / (pct7d + 1))
+	diff7d := priceUSD - (priceUSD / ((pct7d / 100) + 1))
 
 	color, emoji := getReaction(pct24h)
 
