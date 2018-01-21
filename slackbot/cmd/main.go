@@ -84,23 +84,23 @@ func getSingle(ticker string) (slack.Attachment, error) {
 	// CoinMarketCap uses IDs to query the API, not ticker symbols
 	id, err := getID(db, ticker)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
+		return slack.Attachment{}, fmt.Errorf("getSingle: %v", err)
 	}
 
 	if id == "" {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle null ID: %v", err)
+		return slack.Attachment{}, fmt.Errorf("getSingle null ID: %v", err)
 	}
 
 	target := apiEndpoint + id
 
 	resp, err := makeRequest(target)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
+		return slack.Attachment{}, fmt.Errorf("getSingle: %v", err)
 	}
 
 	attachment, err := prepareAttachment(resp)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n getSingle: %s", resp.Status)
+		return slack.Attachment{}, fmt.Errorf("getSingle: %s", resp.Status)
 	}
 
 	return attachment, nil

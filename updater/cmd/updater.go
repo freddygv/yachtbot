@@ -59,16 +59,16 @@ func getAll() error {
 
 	resp, err := makeRequest(target)
 	if err != nil {
-		return fmt.Errorf("\n getAll: %v", err)
+		return fmt.Errorf("getAll: %v", err)
 	}
 
 	tickerMap, err := responseToDict(resp)
 	if err != nil {
-		return fmt.Errorf("\n getAll: %v", err)
+		return fmt.Errorf("getAll: %v", err)
 	}
 
 	if err := updateDB(tickerMap); err != nil {
-		return fmt.Errorf("\n getAll: %v", err)
+		return fmt.Errorf("getAll: %v", err)
 	}
 
 	return nil
