@@ -8,7 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/BurntSushi/toml"
+	"github.com/aws/aws-lambda-go/lambda"
+
 	_ "github.com/lib/pq"
 )
 
@@ -16,12 +17,22 @@ const (
 	apiEndpoint = "https://api.coinmarketcap.com/v1/ticker/"
 )
 
-var client *http.Client
-var db *sql.DB
-var conf botConfig
-var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
+var (
+	client  *http.Client
+	db      *sql.DB
+	dbURL   = os.Getenv("DB_URL")
+	dbPort  = os.Getenv("DB_PORT")
+	dbName  = os.Getenv("DB_NAME")
+	dbTable = os.Getenv("DB_TABLE")
+	dbUser  = os.Getenv("DB_USER")
+	dbPW    = os.Getenv("DB_PW")
+)
 
 func main() {
+	lambda.Start(lambdaHandler)
+}
+
+func lambdaHandler() {
 	err := getAll()
 	if err != nil {
 		panic(err)
@@ -32,14 +43,10 @@ func main() {
 func init() {
 	client = &http.Client{Timeout: time.Second * 10}
 
-	// Decode DB connection details from local conf
-	_, err := toml.DecodeFile(confPath, &conf)
-	if err != nil {
-		panic(err)
-	}
-
 	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-		conf.Db.User, conf.Db.Pw, conf.Db.Name, conf.Db.Endpoint, conf.Db.Port)
+		dbUser, dbPW, dbName, dbURL, dbPort)
+
+	var err error
 
 	db, err = sql.Open("postgres", dbinfo)
 	if err != nil {
@@ -103,7 +110,7 @@ func responseToDict(resp *http.Response) (map[string]string, error) {
 }
 
 func updateDB(tickerMap map[string]string) error {
-	tableName := conf.Db.Table
+	tableName := dbTable
 
 	// Truncating the table then inserting row by row, simplest solution
 	if _, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s;", tableName)); err != nil {
@@ -142,22 +149,4 @@ type Response struct {
 	Change24h       string `json:"percent_change_24h,omitempty"`
 	Change7d        string `json:"percent_change_7d,omitempty"`
 	Updated         string `json:"last_updated,omitempty"`
-}
-
-type botConfig struct {
-	Db    dbConfig
-	Slack slackConfig
-}
-
-type dbConfig struct {
-	Endpoint string
-	Port     string
-	Name     string
-	Table    string
-	User     string
-	Pw       string
-}
-
-type slackConfig struct {
-	Token string
 }
