@@ -98,7 +98,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle: %v", err)
 	}
 
-	attachment, err := processResponse(resp)
+	attachment, err := prepareAttachment(resp)
 	if err != nil {
 		return slack.Attachment{}, fmt.Errorf("\n getSingle: %s", resp.Status)
 	}
@@ -150,29 +150,29 @@ func makeRequest(target string) (*http.Response, error) {
 	return resp, nil
 }
 
-func processResponse(resp *http.Response) (slack.Attachment, error) {
+func prepareAttachment(resp *http.Response) (slack.Attachment, error) {
 	payload := make([]Response, 0)
 	err := json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n processResponse Decode: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n prepareAttachment Decode: %v", err)
 	}
 	resp.Body.Close()
 
 	// No financial decisions better be made out of this, using % change to calculate $ differences
 	priceUSD, err := strconv.ParseFloat(payload[0].PriceUSD, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n processResponse ParseFloat: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n prepareAttachment ParseFloat: %v", err)
 	}
 
 	pct24h, err := strconv.ParseFloat(payload[0].Change24h, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n processResponse ParseFloat: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n prepareAttachment ParseFloat: %v", err)
 	}
 	diff24h := priceUSD - (priceUSD / (pct24h + 1))
 
 	pct7d, err := strconv.ParseFloat(payload[0].Change7d, 64)
 	if err != nil {
-		return slack.Attachment{}, fmt.Errorf("\n processResponse ParseFloat: %v", err)
+		return slack.Attachment{}, fmt.Errorf("\n prepareAttachment ParseFloat: %v", err)
 	}
 	diff7d := priceUSD - (priceUSD / (pct7d + 1))
 
