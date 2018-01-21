@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
-
 	_ "github.com/lib/pq"
 )
 
@@ -54,8 +53,8 @@ func init() {
 	}
 }
 
+// Gets current data for all coins/tokens, don't know another way to get the IDs on demand
 func getAll() error {
-	// Gets current data for all coins/tokens, don't know another way to get the IDs on demand
 	target := apiEndpoint + "?limit=0"
 
 	resp, err := makeRequest(target)
@@ -75,8 +74,8 @@ func getAll() error {
 	return nil
 }
 
+// Prepare and make the request
 func makeRequest(target string) (*http.Response, error) {
-	// Prepare and make the request
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
 		return nil, fmt.Errorf("\n makeRequest NewRequest: %v", err)
@@ -94,6 +93,7 @@ func makeRequest(target string) (*http.Response, error) {
 	return resp, nil
 }
 
+// Storing the JSON array of token data in a map of symbol -> id
 func responseToDict(resp *http.Response) (map[string]string, error) {
 	payload := make([]Response, 0)
 	err := json.NewDecoder(resp.Body).Decode(&payload)
@@ -109,10 +109,10 @@ func responseToDict(resp *http.Response) (map[string]string, error) {
 	return tickerMap, nil
 }
 
+// Truncating the table then inserting row by row, simplest solution
 func updateDB(tickerMap map[string]string) error {
 	tableName := dbTable
 
-	// Truncating the table then inserting row by row, simplest solution
 	if _, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s;", tableName)); err != nil {
 		return fmt.Errorf("\n getAll truncate: %v", err)
 	}
