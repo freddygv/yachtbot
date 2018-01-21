@@ -51,25 +51,47 @@ func getAll() error {
 	// Gets current data for all coins/tokens, don't know another way to get the IDs on demand
 	target := apiEndpoint + "?limit=0"
 
+	resp, err := makeRequest(target)
+	if err != nil {
+		return fmt.Errorf("\n getAll: %v", err)
+	}
+
+	tickerMap, err := responseToDict(resp)
+	if err != nil {
+		return fmt.Errorf("\n getAll: %v", err)
+	}
+
+	if err := updateDB(tickerMap); err != nil {
+		return fmt.Errorf("\n getAll: %v", err)
+	}
+
+	return nil
+}
+
+func makeRequest(target string) (*http.Response, error) {
+	// Prepare and make the request
 	req, err := http.NewRequest("GET", target, nil)
 	if err != nil {
-		return fmt.Errorf("\n getAll req: %v", err)
+		return nil, fmt.Errorf("\n makeRequest NewRequest: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("\n getAll Do: %v", err)
+		return nil, fmt.Errorf("\n makeRequest Do: %v", err)
 	}
-	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return fmt.Errorf("\n Bad response: %s", resp.Status)
+		return nil, fmt.Errorf("\n makeRequest Bad response: %s", resp.Status)
 	}
 
+	return resp, nil
+}
+
+func responseToDict(resp *http.Response) (map[string]string, error) {
 	payload := make([]Response, 0)
-	err = json.NewDecoder(resp.Body).Decode(&payload)
+	err := json.NewDecoder(resp.Body).Decode(&payload)
 	if err != nil {
-		return fmt.Errorf("\n getAll NewDecoder: %v", err)
+		return nil, fmt.Errorf("\n responseToDict NewDecoder: %v", err)
 	}
 
 	tickerMap := make(map[string]string)
@@ -77,20 +99,26 @@ func getAll() error {
 		tickerMap[v.Symbol] = v.ID
 	}
 
+	return tickerMap, nil
+}
+
+func updateDB(tickerMap map[string]string) error {
+	tableName := conf.Db.Table
+
 	// Truncating the table then inserting row by row, simplest solution
-	if _, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s;", conf.Db.Table)); err != nil {
+	if _, err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s;", tableName)); err != nil {
 		return fmt.Errorf("\n getAll truncate: %v", err)
 	}
 
 	for k, v := range tickerMap {
-		stmt, err := db.Prepare(fmt.Sprintf("INSERT INTO %s(ticker, id) VALUES($1, $2);", conf.Db.Table))
+		stmt, err := db.Prepare(fmt.Sprintf("INSERT INTO %s(ticker, id) VALUES($1, $2);", tableName))
 		if err != nil {
-			return fmt.Errorf("\n getAll db.Prepare: %v", err)
+			return fmt.Errorf("\n updateDB db.Prepare: %v", err)
 		}
 
 		_, err = stmt.Exec(k, v)
 		if err != nil {
-			return fmt.Errorf("\n getAll insert exec: %v", err)
+			return fmt.Errorf("\n updateDB insert exec: %v", err)
 		}
 	}
 
