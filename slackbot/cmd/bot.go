@@ -80,7 +80,7 @@ func queryHandler(ctx context.Context, request events.APIGatewayProxyRequest) (e
 
 	attachment, err := getSingle(ticker)
 	if err != nil {
-		log.Fatalf("queryHandler: %v", err) // Stay alive if there's an error
+		log.Fatalf("queryHandler: %v", err)
 	}
 
 	// Send message as slack attachment
