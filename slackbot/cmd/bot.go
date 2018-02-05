@@ -75,6 +75,7 @@ func queryHandler(ctx context.Context, request events.APIGatewayProxyRequest) (e
 	// debug
 	fmt.Println("Mention text:", mention.Event.Text)
 
+	// Get the ticker and pull data
 	tickerSplit := strings.Split(mention.Event.Text, " ")
 	ticker := strings.ToUpper(tickerSplit[len(tickerSplit)-1])
 
