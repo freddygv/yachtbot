@@ -15,3 +15,6 @@
 
 # Binaries
 *.zip
+
+# Dependencies
+**/vendor/
