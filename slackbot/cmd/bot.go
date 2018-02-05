@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/BurntSushi/toml"
 	slackbot "github.com/adampointer/go-slackbot"
 	"github.com/essentialkaos/slack"
 	_ "github.com/lib/pq"
@@ -22,15 +21,24 @@ const (
 	apiEndpoint = "https://api.coinmarketcap.com/v1/ticker/"
 )
 
-var client *http.Client
-var db *sql.DB
-var conf botConfig
+var (
+	client   *http.Client
+	db       *sql.DB
+	err      error
+	dbURL    = os.Getenv("DB_URL")
+	dbPort   = os.Getenv("DB_PORT")
+	dbName   = os.Getenv("DB_NAME")
+	dbTable  = os.Getenv("DB_TABLE")
+	dbUser   = os.Getenv("DB_USER")
+	dbPW     = os.Getenv("DB_PW")
+	botToken = os.Getenv("BOT_TOKEN")
+)
 
 // Contains DB connection details and Slack token
 var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
-	bot := slackbot.New(conf.Slack.Token)
+	bot := slackbot.New(botToken)
 	toMe := bot.Messages(slackbot.DirectMessage, slackbot.DirectMention).Subrouter()
 	toMe.Hear("").MessageHandler(queryHandler)
 	bot.Run()
@@ -39,15 +47,9 @@ func main() {
 func init() {
 	client = &http.Client{Timeout: time.Second * 10}
 
-	// Decode DB and Slack connection properties
-	_, err := toml.DecodeFile(confPath, &conf)
-	if err != nil {
-		panic(err)
-	}
-
 	// Connect to configured AWS RDS
 	dbinfo := fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-		conf.Db.User, conf.Db.Pw, conf.Db.Name, conf.Db.Endpoint, conf.Db.Port)
+		dbUser, dbPW, dbName, dbURL, dbPort)
 
 	db, err = sql.Open("postgres", dbinfo)
 	if err != nil {
@@ -61,9 +63,6 @@ func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEven
 
 	// Easter eggs
 	switch ticker {
-	case "XVG":
-		bot.Reply(evt, ":joy::joy::joy:", slackbot.WithTyping)
-		return
 	case "USD":
 		bot.Reply(evt, ":trash:", slackbot.WithTyping)
 		return
@@ -110,7 +109,7 @@ func getSingle(ticker string) (slack.Attachment, error) {
 func getID(db *sql.DB, ticker string) (string, error) {
 	cleanTicker := strings.Replace(ticker, "$", "", -1)
 
-	stmt, err := db.Prepare(fmt.Sprintf("SELECT id FROM %s WHERE ticker = $1;", conf.Db.Table))
+	stmt, err := db.Prepare(fmt.Sprintf("SELECT id FROM %s WHERE ticker = $1;", dbTable))
 	if err != nil {
 		return "", fmt.Errorf("\n getID db.Prepare: %v", err)
 	}
@@ -267,20 +266,33 @@ type Response struct {
 	Updated         string `json:"last_updated,omitempty"`
 }
 
-type botConfig struct {
-	Db    dbConfig
-	Slack slackConfig
+// Challenge from Slack to validate my API, need to reply with the challenge in plaintext
+// https://api.slack.com/events/url_verification
+type Challenge struct {
+	Token     string `json:"token,omitempty"`
+	Challenge string `json:"challenge,omitempty"`
+	Type      string `json:"type,omitempty"`
 }
 
-type dbConfig struct {
-	Endpoint string
-	Port     string
-	Name     string
-	Table    string
-	User     string
-	Pw       string
+// Mention from Slack
+// https://api.slack.com/events/app_mention#mention
+type Mention struct {
+	Token       string   `json:"token,omitempty"`
+	TeamID      string   `json:"team_id,omitempty"`
+	APIAppID    string   `json:"api_app_id,omitempty"`
+	Event       Event    `json:"event,omitempty"`
+	Type        string   `json:"type,omitempty"`
+	EventID     string   `json:"event_id,omitempty"`
+	EventTime   int      `json:"event_time,omitempty"`
+	AuthedUsers []string `json:"authed_users,omitempty"`
 }
 
-type slackConfig struct {
-	Token string
+// Event details corresponding to a mention
+type Event struct {
+	Type    string `json:"type,omitempty"`
+	User    string `json:"user,omitempty"`
+	Text    string `json:"text,omitempty"`
+	TS      string `json:"ts,omitempty"`
+	Channel string `json:"channel,omitempty"`
+	EventTS string `json:"event_ts,omitempty"`
 }
