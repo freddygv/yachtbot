@@ -13,11 +13,10 @@ import (
 	"strings"
 	"time"
 
-	slackbot "github.com/adampointer/go-slackbot"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/essentialkaos/slack"
 	_ "github.com/lib/pq"
+	"github.com/nlopes/slack"
 )
 
 const (
@@ -73,6 +72,7 @@ func queryHandler(ctx context.Context, request events.APIGatewayProxyRequest) (e
 		log.Fatalf("mention decode: %v", err)
 	}
 
+	// debug
 	fmt.Println("Mention text:", mention.Event.Text)
 
 	tickerSplit := strings.Split(mention.Event.Text, " ")
@@ -80,17 +80,21 @@ func queryHandler(ctx context.Context, request events.APIGatewayProxyRequest) (e
 
 	attachment, err := getSingle(ticker)
 	if err != nil {
-		fmt.Println(err) // Stay alive if there's an error
-		return events.APIGatewayProxyResponse{}, nil
+		log.Fatalf("queryHandler: %v", err) // Stay alive if there's an error
 	}
 
 	// Send message as slack attachment
-	bot := slackbot.New(botToken)
 	params := slack.PostMessageParameters{AsUser: true}
 	params.Attachments = []slack.Attachment{attachment}
-	bot.Client.PostMessage(mention.Event.Channel, "", params)
 
-	return events.APIGatewayProxyResponse{}, nil
+	api := slack.New(botToken)
+	_, _, err = api.PostMessage(mention.Event.Channel, "", params)
+	if err != nil {
+		log.Fatalf("queryHandler: %v", err)
+		return events.APIGatewayProxyResponse{}, err
+	}
+
+	return events.APIGatewayProxyResponse{StatusCode: 200}, nil
 }
 
 // getSingle returns Slack attachment with price information for a single coin/token
