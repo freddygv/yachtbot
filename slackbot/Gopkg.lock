@@ -2,16 +2,16 @@
 
 
 [[projects]]
-  name = "github.com/BurntSushi/toml"
-  packages = ["."]
-  revision = "b26d9c308763d68093482582cea63d69be07a0f0"
-  version = "v0.3.0"
-
-[[projects]]
   branch = "master"
   name = "github.com/adampointer/go-slackbot"
   packages = ["."]
   revision = "90a322f9eda3ee69688a015ce56d7b6930614600"
+
+[[projects]]
+  name = "github.com/aws/aws-lambda-go"
+  packages = ["events","lambda","lambda/messages","lambdacontext"]
+  revision = "6e2e37798efbb1dfd8e9c6681702e683a6046517"
+  version = "v1.0.1"
 
 [[projects]]
   name = "github.com/essentialkaos/slack"
@@ -40,6 +40,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3d89b9784de79d36847b95a99b99e2d474a66e8d8256c9b9f885e9eb53fe7dd4"
+  inputs-digest = "8841af227895cd51e58ada119ed3471f1cceb0f50326ad828e77c8a09554a145"
   solver-name = "gps-cdcl"
   solver-version = 1

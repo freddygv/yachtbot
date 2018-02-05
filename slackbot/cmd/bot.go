@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	slackbot "github.com/adampointer/go-slackbot"
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/essentialkaos/slack"
 	_ "github.com/lib/pq"
 )
@@ -38,10 +41,7 @@ var (
 var confPath = os.Getenv("HOME") + "/.aws_conf/yachtbot.config"
 
 func main() {
-	bot := slackbot.New(botToken)
-	toMe := bot.Messages(slackbot.DirectMessage, slackbot.DirectMention).Subrouter()
-	toMe.Hear("").MessageHandler(queryHandler)
-	bot.Run()
+	lambda.Start(queryHandler)
 }
 
 func init() {
@@ -57,25 +57,40 @@ func init() {
 	}
 }
 
-func queryHandler(ctx context.Context, bot *slackbot.Bot, evt *slack.MessageEvent) {
-	tickerSplit := strings.Split(evt.Msg.Text, " ")
-	ticker := strings.ToUpper(tickerSplit[len(tickerSplit)-1])
-
-	// Easter eggs
-	switch ticker {
-	case "USD":
-		bot.Reply(evt, ":trash:", slackbot.WithTyping)
-		return
+func queryHandler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	// If it's a challenge, unmarshal and reply with challenge.Challenge
+	var challenge *Challenge
+	if err := json.Unmarshal([]byte(request.Body), &challenge); err != nil {
+		log.Fatalf("challenge decode: %v", err)
 	}
+	if challenge.Challenge != "" {
+		return events.APIGatewayProxyResponse{Body: challenge.Challenge, StatusCode: 200}, nil
+	}
+
+	// If it's not a challenge, it should be a mention event
+	var mention *Mention
+	if err := json.Unmarshal([]byte(request.Body), &mention); err != nil {
+		log.Fatalf("mention decode: %v", err)
+	}
+
+	fmt.Println("Mention text:", mention.Event.Text)
+
+	tickerSplit := strings.Split(mention.Event.Text, " ")
+	ticker := strings.ToUpper(tickerSplit[len(tickerSplit)-1])
 
 	attachment, err := getSingle(ticker)
 	if err != nil {
 		fmt.Println(err) // Stay alive if there's an error
-		return
+		return events.APIGatewayProxyResponse{}, nil
 	}
 
-	attachments := []slack.Attachment{attachment}
-	bot.ReplyWithAttachments(evt, attachments, slackbot.WithTyping)
+	// Send message as slack attachment
+	bot := slackbot.New(botToken)
+	params := slack.PostMessageParameters{AsUser: true}
+	params.Attachments = []slack.Attachment{attachment}
+	bot.Client.PostMessage(mention.Event.Channel, "", params)
+
+	return events.APIGatewayProxyResponse{}, nil
 }
 
 // getSingle returns Slack attachment with price information for a single coin/token
