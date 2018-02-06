@@ -8,7 +8,7 @@ YachtBot provides cryptocurrency price information from [CoinMarketCap](https://
 
 ### Components
 * [Updater](https://github.com/freddygv/yachtbot/tree/master/updater): Daily cron job. Populates AWS RDS with ticker to ID mappings.
-* [Slackbot](https://github.com/freddygv/yachtbot/tree/master/slackbot): Handler function for bot mention invocations. Queries DB to get CoinMarketCap ID for a given ticket then fetches and returns price data.
+* [Slackbot](https://github.com/freddygv/yachtbot/tree/master/slackbot): Handler function for bot mention invocations. Queries DB to get CoinMarketCap ID for a given ticker then fetches and returns price data.
 
 ### Deployment
 Both the [updater](https://github.com/freddygv/yachtbot/tree/master/updater) and [slackbot](https://github.com/freddygv/yachtbot/tree/master/slackbot) are running on AWS Lambda.
